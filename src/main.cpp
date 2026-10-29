@@ -57,35 +57,43 @@ void onButtonBPressed()
   Serial.print("Button B pressed (interrupt). Count = ");   // print the text...
   Serial.println(pressCountB);                              // ...then the number
 }
+
 // alarmOff() – turns the alarm OFF.
 // It is used when the alarm times out, when button B silences it,
 // and when the system is disarmed.
+
 void alarmOff()
-{
+{ 
   // 1. Remember that the alarm is no longer on:
   //    set the variable alarmOn to false.
-
+  alarmOn = false;
   // 2. Turn the red LED off.
   //    (Common Commands: "Turn an Output On / Off" – use RED_LED and LOW)
-
+  digitalWrite(RED_LED, LOW);
   // 3. Turn the buzzer off in the same way (use BUZZER and LOW).
+  digitalWrite(BUZZER, LOW);
 }
 
 // startAlarm() – turns the alarm ON and starts the 3-second timer.
 // It is called by onTouchDetected() when the wire is touched while armed.
 void startAlarm()
 {
+  alarmOn = true;
   // 1. Remember that the alarm is on: set alarmOn to true.
 
   // 2. Start the timer: save the time now in the variable alarmStart.
   //    (Common Commands: "Save the Time Now")
   //    The // Timer code in loop() compares millis() with alarmStart
   //    and turns the alarm off after ALARM_TIME (3000 ms).
-
-  // 3. Turn the red LED on (use RED_LED and HIGH).
-
+  alarmStart = millis();
+    if (millis() - alarmStart < ALARM_TIME) {
+      digitalWrite(BUZZER, LOW);  // Turn the buzzer off
+  }
+   // 3. Turn the red LED on (use RED_LED and HIGH).
+   digitalWrite(RED_LED, HIGH);  // Turn the red LED on
   // 4. Turn the buzzer on (use BUZZER and HIGH).
-}
+   digitalWrite(BUZZER, HIGH);    // Turn the buzzer on
+  } 
 
 // toggleArmed() – the callback for button A.
 // Each press switches the system between ARMED and DISARMED.
@@ -93,7 +101,7 @@ void toggleArmed()
 {
   // 1. Flip the variable armed: true becomes false, false becomes true.
   //    (Common Commands: "Flip a bool")
-
+  armed = !armed;
   // 2. Write an if / else that checks whether armed is true.
   //    If armed is true (the system was just armed):
   //      - turn the green LED on (GREEN_LED, HIGH)
@@ -102,6 +110,14 @@ void toggleArmed()
   //      - turn the green LED off (GREEN_LED, LOW)
   //      - call alarmOff(), so an alarm that is ringing stops
   //      - print  System DISARMED  on the Serial Monitor
+  if (armed == true) {
+    digitalWrite(GREEN_LED, HIGH);  // Turn the green LED on
+    Serial.println("System ARMED");
+  } else {
+    digitalWrite(GREEN_LED, LOW);   // Turn the green LED off
+    alarmOff();                      // Stop the alarm if it is ringing
+    Serial.println("System DISARMED");
+  }
 }
 
 // silenceAlarm() – the callback for button B.
@@ -109,8 +125,10 @@ void toggleArmed()
 void silenceAlarm()
 {
   // 1. Call alarmOff() to turn the red LED and the buzzer off.
+  alarmOff();
 
   // 2. Print  Alarm silenced  on the Serial Monitor.
+  Serial.println("Alarm silenced");
 }
 
 // onTouchDetected() – the callback for the touch sensor.
@@ -124,8 +142,11 @@ void onTouchDetected()
   //      - print  TOUCH! Alarm ON  on the Serial Monitor
   //      - call startAlarm()
   //    If the system is not armed, the function does nothing.
+  if (armed == true) {
+    Serial.println("TOUCH! Alarm ON");
+    startAlarm();
+  }
 }
-
 
 // Event handler for button A – runs once for each real press.
 void onButtonAPressed()
@@ -192,16 +213,14 @@ void setup()
 
   // Under // Interrupts: attach touch_ISR() to the touch pin. It runs when the
   // touch value drops below TOUCH_THRESHOLD (Common Commands: "Touch Interrupt").
-  attachInterrupt(digitalPinToInterrupt(TOUCH_PIN), touch_ISR, TOUCH_THRESHOLD);
+  touchAttachInterrupt(TOUCH_PIN, touch_ISR, TOUCH_THRESHOLD);
 
+  // Callbacks
   // Under // Callbacks: choose which function each event calls.
   // No brackets here – you store the function, you do not run it.
   buttonACallback = toggleArmed;     // button A arms and disarms
-  buttonBCallback = alarmOff;        // button B must silence the alarm
+  buttonBCallback = silenceAlarm;        // button B must silence the alarm
   touchCallback = onTouchDetected;   // a touch starts the alarm (if armed)
-
-
-  // Callbacks
 }
 
 void loop()
@@ -236,11 +255,20 @@ void loop()
     buttonBCallback();     // then call the handler
   }
 
-  // Touch sensor (interrupt)
-  // Print the touch value twice a second. Use the command that reads the
-  // touch sensor (Common Commands: "Read the Touch Sensor").
-  Serial.println(analogRead(TOUCH_PIN));   // calibration – remove after Step 1
-    delay(500);                                // calibration – remove after Step 1
+// Touch sensor (interrupt) – the flag pattern again, like button B.
+if (touchFlag == true)
+{
+  touchFlag = false;     // lower the flag
+  touchCallback();       // call the touch callback ("Call a Callback")
+}
+
+// Timer – turn the alarm off when ALARM_TIME has passed since alarmStart.
+// Use the time since start (Common Commands: "Time Passed").
+if (alarmOn == true && millis() - alarmStart >= ALARM_TIME)
+{
+  alarmOff();
+  Serial.println("Alarm timed out");
+}
 
   // Timer
 }
