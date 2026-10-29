@@ -90,9 +90,9 @@ void startAlarm()
       digitalWrite(BUZZER, LOW);  // Turn the buzzer off
   }
    // 3. Turn the red LED on (use RED_LED and HIGH).
-   digitalWrite(RED_LED, HIGH);  // Turn the red LED on
+      digitalWrite(RED_LED, HIGH);  // Turn the red LED on
   // 4. Turn the buzzer on (use BUZZER and HIGH).
-   digitalWrite(BUZZER, HIGH);    // Turn the buzzer on
+      digitalWrite(BUZZER, HIGH);    // Turn the buzzer on
   } 
 
 // toggleArmed() – the callback for button A.
@@ -245,7 +245,6 @@ void loop()
         buttonACallback(); // call the event handler
       }
     }
-
 
   // Button B (interrupt)
   // Flag pattern: did the ISR raise the flag?
