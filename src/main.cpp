@@ -12,9 +12,22 @@
 
 // ---------- Global variables ----------
 
+// The state of button A on the last pass of loop(). It starts released (HIGH).
+int lastStateA = HIGH;
+int pressCountA = 0;                          // How many presses have been counted.
+unsigned long lastChangeA = 0; // The time (in ms) of the last change that was accepted.
+// Changes closer together than 50 ms are bounce, so they are ignored.
+const unsigned long DEBOUNCE_TIME = 50;
 
 // ---------- Event handlers and callbacks ----------
 
+// Event handler for button A – runs once for each real press.
+void onButtonAPressed()
+{
+  pressCountA++;                                // add 1 to the count
+  Serial.print("Button A pressed. Count = ");   // print the text...
+  Serial.println(pressCountA);                  // ...then the number and a new line
+}
 
 // ---------- Interrupt Service Routines (ISRs) ----------
 
@@ -49,12 +62,25 @@ void loop()
 {
   // Button A (polling)
 
-  // Read button A on every pass of loop() – this is polling.
-  // Use the command that gives HIGH or LOW (Common Commands: "Read a Pin").
-  if (digitalRead(BUTTON_A) == LOW)      // LOW = the button is pressed
-  {
-    Serial.println("Button A is pressed");
-  }
+  // 1. Read button A now (Common Commands: "Read a Pin").
+  int stateA =digitalRead(BUTTON_A);
+
+  // 2. Did the state change, AND has more than DEBOUNCE_TIME passed
+  //    since the last change? (Common Commands: "Time Since Start")
+    if (stateA != lastStateA && millis() - lastChangeA > DEBOUNCE_TIME)
+    {
+      // 3. Accept the change: save the time now, and remember the new state.
+      lastChangeA = millis();
+      lastStateA = stateA;
+
+    // 4. Only a change to "pressed" is a press event.
+    //    Is a pressed button HIGH or LOW?
+      if (stateA == LOW)
+      {
+        onButtonAPressed();   // call the event handler
+      }
+    }
+
 
   // Button B (interrupt)
 
