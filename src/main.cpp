@@ -128,6 +128,10 @@ void loop()
   }
 
   // Touch sensor (interrupt)
+  // Print the touch value twice a second. Use the command that reads the
+  // touch sensor (Common Commands: "Read the Touch Sensor").
+  Serial.println(analogRead(TOUCH_PIN));   // calibration – remove after Step 1
+    delay(500);                                // calibration – remove after Step 1
 
   // Timer
 }
