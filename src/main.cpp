@@ -28,6 +28,25 @@ volatile unsigned long lastInterruptB = 0;
 // pressCountB is only used in loop(), so it needs no keyword.
 int pressCountB = 0;
 
+// Your threshold from the calibration table: (not touched + touched) ÷ 2.
+const int TOUCH_THRESHOLD = 112;
+
+// A Callback is a variable that holds a function (no inputs, returns nothing).
+typedef void (*Callback)();
+Callback buttonACallback;   // what button A does
+Callback buttonBCallback;   // what button B does
+Callback touchCallback;     // what a touch does
+
+// Changed inside touch_ISR(), so they are volatile.
+volatile bool touchFlag = false;        // raised by the ISR on a touch
+volatile unsigned long lastTouch = 0;   // time of the last accepted touch
+
+// The state of the alarm (only used outside the ISRs).
+bool armed = false;                     // true = system armed (green LED on)
+bool alarmOn = false;                   // true = red LED and buzzer on
+unsigned long alarmStart = 0;           // the time the alarm started
+const unsigned long ALARM_TIME = 3000;  // how long the alarm lasts: 3000 ms
+
 // ---------- Event handlers and callbacks ----------
 
 // Event handler for button B – called from loop(), never from the ISR,
@@ -37,6 +56,74 @@ void onButtonBPressed()
   pressCountB++;                                            // add 1 to the count
   Serial.print("Button B pressed (interrupt). Count = ");   // print the text...
   Serial.println(pressCountB);                              // ...then the number
+}
+// alarmOff() – turns the alarm OFF.
+// It is used when the alarm times out, when button B silences it,
+// and when the system is disarmed.
+void alarmOff()
+{
+  // 1. Remember that the alarm is no longer on:
+  //    set the variable alarmOn to false.
+
+  // 2. Turn the red LED off.
+  //    (Common Commands: "Turn an Output On / Off" – use RED_LED and LOW)
+
+  // 3. Turn the buzzer off in the same way (use BUZZER and LOW).
+}
+
+// startAlarm() – turns the alarm ON and starts the 3-second timer.
+// It is called by onTouchDetected() when the wire is touched while armed.
+void startAlarm()
+{
+  // 1. Remember that the alarm is on: set alarmOn to true.
+
+  // 2. Start the timer: save the time now in the variable alarmStart.
+  //    (Common Commands: "Save the Time Now")
+  //    The // Timer code in loop() compares millis() with alarmStart
+  //    and turns the alarm off after ALARM_TIME (3000 ms).
+
+  // 3. Turn the red LED on (use RED_LED and HIGH).
+
+  // 4. Turn the buzzer on (use BUZZER and HIGH).
+}
+
+// toggleArmed() – the callback for button A.
+// Each press switches the system between ARMED and DISARMED.
+void toggleArmed()
+{
+  // 1. Flip the variable armed: true becomes false, false becomes true.
+  //    (Common Commands: "Flip a bool")
+
+  // 2. Write an if / else that checks whether armed is true.
+  //    If armed is true (the system was just armed):
+  //      - turn the green LED on (GREEN_LED, HIGH)
+  //      - print  System ARMED  on the Serial Monitor
+  //    Else (the system was just disarmed):
+  //      - turn the green LED off (GREEN_LED, LOW)
+  //      - call alarmOff(), so an alarm that is ringing stops
+  //      - print  System DISARMED  on the Serial Monitor
+}
+
+// silenceAlarm() – the callback for button B.
+// It stops the alarm but keeps the system armed.
+void silenceAlarm()
+{
+  // 1. Call alarmOff() to turn the red LED and the buzzer off.
+
+  // 2. Print  Alarm silenced  on the Serial Monitor.
+}
+
+// onTouchDetected() – the callback for the touch sensor.
+// loop() calls it every time touch_ISR() raises touchFlag.
+void onTouchDetected()
+{
+  // 1. Write an if that checks whether armed is true.
+  //    The alarm must only start when the system is armed.
+
+  // 2. Inside the if:
+  //      - print  TOUCH! Alarm ON  on the Serial Monitor
+  //      - call startAlarm()
+  //    If the system is not armed, the function does nothing.
 }
 
 
@@ -62,6 +149,17 @@ void IRAM_ATTR buttonB_ISR()
   }
 }
 
+// ISR for the touch wire. The blank is the same keyword as in buttonB_ISR().
+// While a finger stays on the wire this ISR keeps running, so only one
+// touch per second is accepted.
+void IRAM_ATTR touch_ISR()
+{
+  if (millis() - lastTouch > 1000)
+  {
+    lastTouch = millis();   // remember when this touch happened
+    touchFlag = true;       // raise the flag for loop()
+  }
+}
 
 void setup()
 {
@@ -92,6 +190,17 @@ void setup()
   //            RISING, FALLING or CHANGE?
   attachInterrupt(digitalPinToInterrupt(BUTTON_B), buttonB_ISR, FALLING);
 
+  // Under // Interrupts: attach touch_ISR() to the touch pin. It runs when the
+  // touch value drops below TOUCH_THRESHOLD (Common Commands: "Touch Interrupt").
+  attachInterrupt(digitalPinToInterrupt(TOUCH_PIN), touch_ISR, TOUCH_THRESHOLD);
+
+  // Under // Callbacks: choose which function each event calls.
+  // No brackets here – you store the function, you do not run it.
+  buttonACallback = toggleArmed;     // button A arms and disarms
+  buttonBCallback = alarmOff;        // button B must silence the alarm
+  touchCallback = onTouchDetected;   // a touch starts the alarm (if armed)
+
+
   // Callbacks
 }
 
@@ -114,7 +223,7 @@ void loop()
     //    Is a pressed button HIGH or LOW?
       if (stateA == LOW)
       {
-        onButtonAPressed();   // call the event handler
+        buttonACallback(); // call the event handler
       }
     }
 
@@ -124,7 +233,7 @@ void loop()
   if (buttonBFlag == true)
   {
     buttonBFlag = false;   // lower the flag first, so the press is handled once
-    onButtonBPressed();    // then call the handler
+    buttonBCallback();     // then call the handler
   }
 
   // Touch sensor (interrupt)
