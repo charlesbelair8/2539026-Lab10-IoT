@@ -19,7 +19,26 @@ unsigned long lastChangeA = 0; // The time (in ms) of the last change that was a
 // Changes closer together than 50 ms are bounce, so they are ignored.
 const unsigned long DEBOUNCE_TIME = 50;
 
+// These two variables are changed inside the ISR, so they need the keyword
+// for a shared ISR variable (Common Commands: "Shared ISR Variable").
+// buttonBFlag: raised (true) by the ISR when button B is pressed.
+volatile bool buttonBFlag = false;
+// lastInterruptB: the time of the last accepted press (used to debounce).
+volatile unsigned long lastInterruptB = 0;
+// pressCountB is only used in loop(), so it needs no keyword.
+int pressCountB = 0;
+
 // ---------- Event handlers and callbacks ----------
+
+// Event handler for button B – called from loop(), never from the ISR,
+// so Serial.print() is allowed here.
+void onButtonBPressed()
+{
+  pressCountB++;                                            // add 1 to the count
+  Serial.print("Button B pressed (interrupt). Count = ");   // print the text...
+  Serial.println(pressCountB);                              // ...then the number
+}
+
 
 // Event handler for button A – runs once for each real press.
 void onButtonAPressed()
@@ -30,6 +49,18 @@ void onButtonAPressed()
 }
 
 // ---------- Interrupt Service Routines (ISRs) ----------
+// ISR for button B – runs the instant the pin falls, even if loop() is busy.
+// Blank before the name: the keyword that keeps an ISR in fast memory
+// (Common Commands: "ISR Function"). Keep an ISR short: no Serial, no delay().
+void IRAM_ATTR buttonB_ISR()
+{
+  // Ignore presses less than 200 ms apart (debounce inside the ISR).
+  if (millis() - lastInterruptB > 200)
+  {
+    lastInterruptB = millis();   // remember when this press happened
+    buttonBFlag = true;        // raise the flag for loop(): true or false?
+  }
+}
 
 
 void setup()
@@ -54,6 +85,12 @@ void setup()
   pinMode(BUZZER, OUTPUT);
 
   // Interrupts
+  // Run buttonB_ISR() when the pin of button B changes (Common Commands:
+  // "Attach an Interrupt").
+  // 1st blank: the command that turns a pin number into an interrupt number.
+  // 2nd blank: the mode. Button B goes HIGH → LOW when pressed:
+  //            RISING, FALLING or CHANGE?
+  attachInterrupt(digitalPinToInterrupt(BUTTON_B), buttonB_ISR, FALLING);
 
   // Callbacks
 }
@@ -83,6 +120,12 @@ void loop()
 
 
   // Button B (interrupt)
+  // Flag pattern: did the ISR raise the flag?
+  if (buttonBFlag == true)
+  {
+    buttonBFlag = false;   // lower the flag first, so the press is handled once
+    onButtonBPressed();    // then call the handler
+  }
 
   // Touch sensor (interrupt)
 
